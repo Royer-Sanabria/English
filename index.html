@@ -12,6 +12,7 @@
     --muted: #9aa1ac;
     --accent: #4f8cff;
     --border: #262b34;
+    --danger: #ff5c5c;
   }
   * { box-sizing: border-box; }
   body {
@@ -45,21 +46,20 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    padding: 2.5rem 1.5rem;
     text-align: center;
-    padding: 3rem 1.5rem;
   }
   main img.hero {
-    width: 96px;
-    height: 96px;
+    width: 72px;
+    height: 72px;
     object-fit: cover;
-    border-radius: 20px;
-    margin-bottom: 1.5rem;
+    border-radius: 16px;
+    margin-bottom: 1rem;
     box-shadow: 0 8px 30px rgba(79, 140, 255, 0.25);
   }
   h1 {
-    font-size: 2rem;
-    margin: 0 0 0.5rem;
+    font-size: 1.75rem;
+    margin: 0 0 0.4rem;
   }
   p.subtitle {
     color: var(--muted);
@@ -67,15 +67,71 @@
     margin: 0 0 2rem;
     line-height: 1.5;
   }
-  .badge {
-    display: inline-block;
-    padding: 0.35rem 0.9rem;
+  .toast {
+    background: var(--accent);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    display: none;
+  }
+  .words-section {
+    width: 100%;
+    max-width: 480px;
+    text-align: left;
+    margin-bottom: 2.5rem;
+  }
+  .words-section h2 {
+    font-size: 1.1rem;
+    margin: 0 0 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .words-section h2 .count {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 400;
+  }
+  #word-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  #word-list li {
     background: var(--bg-alt);
     border: 1px solid var(--border);
-    border-radius: 999px;
-    color: var(--accent);
-    font-size: 0.85rem;
-    margin-bottom: 2rem;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    word-break: break-word;
+  }
+  #word-list li span.text {
+    flex: 1;
+  }
+  #word-list li button {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.25rem;
+  }
+  .empty {
+    color: var(--muted);
+    font-size: 0.9rem;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    text-align: center;
   }
   .features {
     display: grid;
@@ -122,25 +178,35 @@
 
   <main>
     <img class="hero" src="icon.png" alt="English app icon">
-    <span class="badge">En desarrollo</span>
     <h1>English</h1>
     <p class="subtitle">
-      Una extensión de navegador para aprender inglés integrada en tu navegación diaria.
-      Todavía en construcción — pronto más funciones aquí.
+      Selecciona una palabra o frase en cualquier app de tu iPhone, compártela con "Inglés"
+      y se guarda aquí en tu lista de vocabulario.
     </p>
+
+    <div class="toast" id="toast">Agregado a tu lista ✓</div>
+
+    <div class="words-section">
+      <h2>Mis palabras <span class="count" id="word-count"></span></h2>
+      <ul id="word-list"></ul>
+      <div class="empty" id="empty-state">
+        Todavía no tienes palabras guardadas.<br>
+        Selecciona texto en cualquier app → Compartir → Inglés.
+      </div>
+    </div>
 
     <div class="features">
       <div class="card">
         <h3>Vocabulario en contexto</h3>
-        <p>Aprende palabras nuevas mientras navegas, sin salir de la página.</p>
+        <p>Guarda palabras nuevas mientras navegas, sin salir de la app.</p>
       </div>
       <div class="card">
-        <h3>Práctica rápida</h3>
-        <p>Repasos cortos para reforzar lo aprendido sin interrumpir tu día.</p>
+        <h3>Desde cualquier app</h3>
+        <p>Usa el Atajo "Inglés" en el menú Compartir de iOS.</p>
       </div>
       <div class="card">
         <h3>Progreso simple</h3>
-        <p>Sigue tu avance de forma clara, sin complicaciones.</p>
+        <p>Tu lista se guarda en este dispositivo, sin complicaciones.</p>
       </div>
     </div>
   </main>
@@ -148,5 +214,82 @@
   <footer>
     <a href="https://github.com/Royer-Sanabria/English">Ver código en GitHub</a>
   </footer>
+
+  <script>
+    const STORAGE_KEY = 'english-words';
+
+    function getWords() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveWords(words) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+    }
+
+    function render() {
+      const words = getWords();
+      const list = document.getElementById('word-list');
+      const empty = document.getElementById('empty-state');
+      const count = document.getElementById('word-count');
+
+      count.textContent = words.length ? `(${words.length})` : '';
+      list.innerHTML = '';
+
+      if (words.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      words.slice().reverse().forEach((word, i) => {
+        const realIndex = words.length - 1 - i;
+        const li = document.createElement('li');
+
+        const span = document.createElement('span');
+        span.className = 'text';
+        span.textContent = word;
+
+        const btn = document.createElement('button');
+        btn.textContent = '✕';
+        btn.setAttribute('aria-label', 'Eliminar');
+        btn.onclick = () => {
+          const current = getWords();
+          current.splice(realIndex, 1);
+          saveWords(current);
+          render();
+        };
+
+        li.appendChild(span);
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+    }
+
+    function addFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const toAdd = params.get('add') || params.get('text');
+      if (toAdd && toAdd.trim()) {
+        const words = getWords();
+        words.push(toAdd.trim());
+        saveWords(words);
+
+        const toast = document.getElementById('toast');
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 2500);
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete('add');
+        url.searchParams.delete('text');
+        window.history.replaceState({}, '', url.pathname);
+      }
+    }
+
+    addFromQuery();
+    render();
+  </script>
 </body>
 </html>
