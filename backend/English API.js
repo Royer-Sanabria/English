@@ -2,14 +2,18 @@
  * Google Apps Script — backend para el Atajo "Inglés" de iOS y la página web.
  * Proyecto standalone en script.google.com, no vinculado a la hoja.
  *
+ * La generación de definición/ejemplos (Gemini) la hace la página web en el navegador;
+ * este script solo guarda el resultado.
+ *
  * Uso:
  *  - Agregar palabra:  GET /exec?text=<palabra o frase>   (si ya existe, suma 1 al conteo)
  *  - Listar palabras:  GET /exec?action=list
  *  - Borrar palabra:   GET /exec?action=delete&row=<numero de fila>
+ *  - Guardar definición/ejemplos: GET /exec?action=update&row=<n>&definition=<...>&examples=<...>
  */
 
 const SHEET_ID = '1-S-yUPdSiHzM40Ff7WcXlygHVeZ2sl5IZEmNEpUS26c';
-const HEADERS = ['Primera vez', 'Palabra', 'Veces', 'Última vez'];
+const HEADERS = ['Primera vez', 'Palabra', 'Veces', 'Última vez', 'Definición', 'Ejemplos'];
 
 function ensureHeaders_(sheet) {
   const firstRow = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
@@ -55,7 +59,7 @@ function addWord_(sheet, text) {
     return jsonResponse_({ ok: true, saved: trimmed, count: newCount });
   }
 
-  sheet.appendRow([now, trimmed, 1, now]);
+  sheet.appendRow([now, trimmed, 1, now, '', '']);
   return jsonResponse_({ ok: true, saved: trimmed, count: 1 });
 }
 
@@ -63,13 +67,15 @@ function listWords_(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return jsonResponse_({ ok: true, words: [] });
 
-  const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
   const words = data.map((row, i) => ({
     row: i + 2,
     firstDate: row[0] instanceof Date ? row[0].toISOString() : String(row[0]),
     text: row[1],
     count: row[2] || 1,
-    lastDate: row[3] instanceof Date ? row[3].toISOString() : String(row[3] || row[0])
+    lastDate: row[3] instanceof Date ? row[3].toISOString() : String(row[3] || row[0]),
+    definition: row[4] || '',
+    examples: row[5] ? String(row[5]).split(' | ') : []
   })).sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
 
   return jsonResponse_({ ok: true, words });
@@ -79,6 +85,15 @@ function deleteWord_(sheet, rowParam) {
   const row = parseInt(rowParam, 10);
   if (!row || row < 2) return jsonResponse_({ ok: false, error: 'Invalid row' });
   sheet.deleteRow(row);
+  return jsonResponse_({ ok: true });
+}
+
+function updateWordInfo_(sheet, rowParam, definition, examplesParam) {
+  const row = parseInt(rowParam, 10);
+  if (!row || row < 2) return jsonResponse_({ ok: false, error: 'Invalid row' });
+
+  sheet.getRange(row, 5).setValue(definition || '');
+  sheet.getRange(row, 6).setValue(examplesParam || '');
   return jsonResponse_({ ok: true });
 }
 
@@ -94,6 +109,10 @@ function doGet(e) {
 
   if (action === 'delete') {
     return deleteWord_(sheet, e.parameter.row);
+  }
+
+  if (action === 'update') {
+    return updateWordInfo_(sheet, e.parameter.row, e.parameter.definition, e.parameter.examples);
   }
 
   const text = e.parameter.text;

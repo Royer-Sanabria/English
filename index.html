@@ -206,13 +206,35 @@
     border-radius: 10px;
     padding: 0.75rem 1rem;
     display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    word-break: break-word;
+  }
+  #word-list li .row {
+    display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    word-break: break-word;
   }
   #word-list li span.text {
     flex: 1;
+    font-weight: 500;
+  }
+  .word-detail {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  .word-detail .definition {
+    margin-bottom: 0.25rem;
+  }
+  .word-detail .examples {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+  .word-detail .loading {
+    font-style: italic;
+    opacity: 0.7;
   }
   #word-list li .badge-count {
     background: var(--accent);
@@ -337,10 +359,18 @@
 
   <script>
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8qCTmE1wsdLz2KrSbi1hI9UER0_4pfN83FXCHgQqGl7Te2yTwz93SKTq2NLyqzLjgPQ/exec';
+    const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.4.0';
+    const APP_VERSION = '1.5.0';
     const CHANGELOG = [
+      {
+        version: '1.5.0',
+        date: '2026-08-28',
+        changes: [
+          'Cada palabra nueva ahora incluye su definición en inglés y 2 ejemplos de uso, generados automáticamente.'
+        ]
+      },
       {
         version: '1.4.0',
         date: '2026-08-28',
@@ -461,6 +491,72 @@
       if (!data.ok) throw new Error(data.error || 'Error al borrar');
     }
 
+    async function generateWordInfo(word) {
+      const prompt = 'Give a short English dictionary definition and exactly 2 short example ' +
+        'sentences using this word or phrase: "' + word + '". ' +
+        'Respond ONLY with valid JSON, no markdown formatting, in exactly this shape: ' +
+        '{"definition":"...","examples":["...","..."]}';
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        }
+      );
+      const data = await res.json();
+      const raw = data.candidates[0].content.parts[0].text;
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      return { definition: parsed.definition || '', examples: parsed.examples || [] };
+    }
+
+    async function saveWordInfo(row, definition, examples) {
+      const params = new URLSearchParams({
+        action: 'update',
+        row,
+        definition,
+        examples: examples.join(' | ')
+      });
+      await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`);
+    }
+
+    function renderDetail(detailEl, word) {
+      if (word.definition) {
+        detailEl.innerHTML = '';
+
+        const def = document.createElement('div');
+        def.className = 'definition';
+        def.textContent = word.definition;
+        detailEl.appendChild(def);
+
+        if (word.examples.length) {
+          const ul = document.createElement('ul');
+          ul.className = 'examples';
+          word.examples.forEach(ex => {
+            const li = document.createElement('li');
+            li.textContent = ex;
+            ul.appendChild(li);
+          });
+          detailEl.appendChild(ul);
+        }
+        return;
+      }
+
+      detailEl.innerHTML = '<span class="loading">Generando definición…</span>';
+      generateWordInfo(word.text)
+        .then(info => {
+          word.definition = info.definition;
+          word.examples = info.examples;
+          renderDetail(detailEl, word);
+          saveWordInfo(word.row, info.definition, info.examples);
+        })
+        .catch(() => {
+          detailEl.innerHTML = '';
+        });
+    }
+
     async function render() {
       const list = document.getElementById('word-list');
       const empty = document.getElementById('empty-state');
@@ -481,18 +577,20 @@
 
         words.forEach(word => {
           const li = document.createElement('li');
+          const row = document.createElement('div');
+          row.className = 'row';
 
           const span = document.createElement('span');
           span.className = 'text';
           span.textContent = word.text;
-          li.appendChild(span);
+          row.appendChild(span);
 
           if (word.count > 1) {
             const badge = document.createElement('span');
             badge.className = 'badge-count';
             badge.textContent = `×${word.count}`;
             badge.title = `Compartida ${word.count} veces`;
-            li.appendChild(badge);
+            row.appendChild(badge);
           }
 
           const btn = document.createElement('button');
@@ -508,7 +606,14 @@
             }
           };
 
-          li.appendChild(btn);
+          row.appendChild(btn);
+          li.appendChild(row);
+
+          const detail = document.createElement('div');
+          detail.className = 'word-detail';
+          li.appendChild(detail);
+          renderDetail(detail, word);
+
           list.appendChild(li);
         });
       } catch (err) {
