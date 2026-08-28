@@ -214,6 +214,15 @@
   #word-list li span.text {
     flex: 1;
   }
+  #word-list li .badge-count {
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
   #word-list li button {
     background: none;
     border: none;
@@ -330,8 +339,15 @@
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8qCTmE1wsdLz2KrSbi1hI9UER0_4pfN83FXCHgQqGl7Te2yTwz93SKTq2NLyqzLjgPQ/exec';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.3.0';
+    const APP_VERSION = '1.4.0';
     const CHANGELOG = [
+      {
+        version: '1.4.0',
+        date: '2026-08-28',
+        changes: [
+          'Si compartes la misma palabra más de una vez, ahora se lleva un conteo (×2, ×3, etc.) en vez de duplicarla en la lista.'
+        ]
+      },
       {
         version: '1.3.0',
         date: '2026-08-27',
@@ -469,6 +485,15 @@
           const span = document.createElement('span');
           span.className = 'text';
           span.textContent = word.text;
+          li.appendChild(span);
+
+          if (word.count > 1) {
+            const badge = document.createElement('span');
+            badge.className = 'badge-count';
+            badge.textContent = `×${word.count}`;
+            badge.title = `Compartida ${word.count} veces`;
+            li.appendChild(badge);
+          }
 
           const btn = document.createElement('button');
           btn.textContent = '✕';
@@ -483,7 +508,6 @@
             }
           };
 
-          li.appendChild(span);
           li.appendChild(btn);
           list.appendChild(li);
         });
