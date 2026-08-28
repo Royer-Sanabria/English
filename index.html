@@ -297,6 +297,102 @@
     color: var(--accent);
     text-decoration: none;
   }
+  .practice-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .practice-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .practice-panel {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 420px;
+    width: 100%;
+    padding: 1.75rem 1.5rem;
+    text-align: center;
+    position: relative;
+  }
+  .practice-panel .close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+  }
+  .practice-progress {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
+  }
+  .practice-word {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    word-break: break-word;
+  }
+  .practice-reveal-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .practice-detail {
+    text-align: left;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+  }
+  .practice-detail .definition {
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+  .practice-detail ul {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+  .practice-actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .practice-actions button {
+    flex: 1;
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-dontknow {
+    background: rgba(255, 92, 92, 0.15);
+    color: var(--danger);
+  }
+  .btn-know {
+    background: rgba(79, 140, 255, 0.15);
+    color: var(--accent);
+  }
+  .practice-summary {
+    font-size: 1.1rem;
+  }
+  .practice-summary .practice-close-final {
+    margin-top: 1.5rem;
+  }
 </style>
 </head>
 <body>
@@ -318,6 +414,13 @@
     </div>
   </div>
 
+  <div class="menu-overlay" id="practice-overlay">
+    <div class="practice-panel">
+      <button class="close-btn" id="practice-close">✕</button>
+      <div id="practice-body"></div>
+    </div>
+  </div>
+
   <main>
     <img class="hero" src="icon.png" alt="English app icon">
     <h1>English</h1>
@@ -329,7 +432,10 @@
     <div class="toast" id="toast">Agregado a tu lista ✓</div>
 
     <div class="words-section">
-      <h2>Mis palabras <span class="count" id="word-count"></span></h2>
+      <h2>
+        Mis palabras <span class="count" id="word-count"></span>
+        <button class="practice-btn" id="practice-btn">Practicar</button>
+      </h2>
       <ul id="word-list"></ul>
       <div class="empty" id="empty-state">
         Todavía no tienes palabras guardadas.<br>
@@ -362,8 +468,15 @@
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.5.0';
+    const APP_VERSION = '1.6.0';
     const CHANGELOG = [
+      {
+        version: '1.6.0',
+        date: '2026-08-28',
+        changes: [
+          'Nuevo modo "Practicar": tarjetas con repetición espaciada. Las palabras que menos dominas y las que más has compartido aparecen con más frecuencia.'
+        ]
+      },
       {
         version: '1.5.0',
         date: '2026-08-28',
@@ -627,6 +740,148 @@
     document.getElementById('menu-close').onclick = closeMenu;
     document.getElementById('menu-overlay').onclick = (e) => {
       if (e.target.id === 'menu-overlay') closeMenu();
+    };
+
+    const MAX_LEVEL = 5;
+    let practiceQueue = [];
+    let practiceIndex = 0;
+    let practiceReviewed = 0;
+
+    async function reviewWord(row, result) {
+      await fetch(`${APPS_SCRIPT_URL}?action=review&row=${row}&result=${result}`);
+    }
+
+    function weightedSample(words, count) {
+      const withKeys = words.map(w => {
+        const priority = (MAX_LEVEL - (w.level || 0) + 1) + Math.min(w.count || 1, 5);
+        return { word: w, key: Math.pow(Math.random(), 1 / priority) };
+      });
+      withKeys.sort((a, b) => b.key - a.key);
+      return withKeys.slice(0, count).map(x => x.word);
+    }
+
+    function renderPracticeCard() {
+      const body = document.getElementById('practice-body');
+
+      if (practiceIndex >= practiceQueue.length) {
+        body.innerHTML = '';
+        const summary = document.createElement('div');
+        summary.className = 'practice-summary';
+        summary.textContent = `¡Listo! Repasaste ${practiceReviewed} palabra${practiceReviewed === 1 ? '' : 's'}.`;
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'practice-btn practice-close-final';
+        closeBtn.textContent = 'Cerrar';
+        closeBtn.onclick = closePractice;
+        body.appendChild(summary);
+        body.appendChild(closeBtn);
+        return;
+      }
+
+      const word = practiceQueue[practiceIndex];
+      body.innerHTML = '';
+
+      const progress = document.createElement('div');
+      progress.className = 'practice-progress';
+      progress.textContent = `${practiceIndex + 1} / ${practiceQueue.length}`;
+      body.appendChild(progress);
+
+      const wordEl = document.createElement('div');
+      wordEl.className = 'practice-word';
+      wordEl.textContent = word.text;
+      body.appendChild(wordEl);
+
+      const revealBtn = document.createElement('button');
+      revealBtn.className = 'practice-reveal-btn';
+      revealBtn.textContent = 'Mostrar significado';
+      body.appendChild(revealBtn);
+
+      const detail = document.createElement('div');
+      detail.className = 'practice-detail';
+      detail.style.display = 'none';
+
+      const def = document.createElement('div');
+      def.className = 'definition';
+      def.textContent = word.definition;
+      detail.appendChild(def);
+
+      if (word.examples.length) {
+        const ul = document.createElement('ul');
+        word.examples.forEach(ex => {
+          const li = document.createElement('li');
+          li.textContent = ex;
+          ul.appendChild(li);
+        });
+        detail.appendChild(ul);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'practice-actions';
+      actions.style.display = 'none';
+
+      const dontKnowBtn = document.createElement('button');
+      dontKnowBtn.className = 'btn-dontknow';
+      dontKnowBtn.textContent = '😅 No la sabía';
+      dontKnowBtn.onclick = () => nextPracticeCard(word, 'dontknow');
+
+      const knowBtn = document.createElement('button');
+      knowBtn.className = 'btn-know';
+      knowBtn.textContent = '✅ La sabía';
+      knowBtn.onclick = () => nextPracticeCard(word, 'know');
+
+      actions.appendChild(dontKnowBtn);
+      actions.appendChild(knowBtn);
+
+      revealBtn.onclick = () => {
+        revealBtn.style.display = 'none';
+        detail.style.display = 'block';
+        actions.style.display = 'flex';
+      };
+
+      body.appendChild(detail);
+      body.appendChild(actions);
+    }
+
+    function nextPracticeCard(word, result) {
+      reviewWord(word.row, result);
+      practiceReviewed++;
+      practiceIndex++;
+      renderPracticeCard();
+    }
+
+    function closePractice() {
+      document.getElementById('practice-overlay').classList.remove('open');
+    }
+
+    async function startPractice() {
+      const btn = document.getElementById('practice-btn');
+      btn.disabled = true;
+      btn.textContent = 'Cargando…';
+
+      try {
+        const words = await fetchWords();
+        const practicable = words.filter(w => w.definition);
+
+        if (practicable.length === 0) {
+          alert('Todavía no hay palabras con definición lista para practicar. Espera un momento e intenta de nuevo.');
+          return;
+        }
+
+        practiceQueue = weightedSample(practicable, Math.min(10, practicable.length));
+        practiceIndex = 0;
+        practiceReviewed = 0;
+
+        document.getElementById('practice-overlay').classList.add('open');
+        renderPracticeCard();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Practicar';
+      }
+    }
+
+    document.getElementById('practice-btn').onclick = startPractice;
+    document.getElementById('practice-close').onclick = closePractice;
+    document.getElementById('practice-overlay').onclick = (e) => {
+      if (e.target.id === 'practice-overlay') closePractice();
     };
 
     renderChangelog();

@@ -10,10 +10,12 @@
  *  - Listar palabras:  GET /exec?action=list
  *  - Borrar palabra:   GET /exec?action=delete&row=<numero de fila>
  *  - Guardar definición/ejemplos: GET /exec?action=update&row=<n>&definition=<...>&examples=<...>
+ *  - Registrar repaso: GET /exec?action=review&row=<n>&result=know|dontknow
  */
 
 const SHEET_ID = '1-S-yUPdSiHzM40Ff7WcXlygHVeZ2sl5IZEmNEpUS26c';
-const HEADERS = ['Primera vez', 'Palabra', 'Veces', 'Última vez', 'Definición', 'Ejemplos'];
+const HEADERS = ['Primera vez', 'Palabra', 'Veces', 'Última vez', 'Definición', 'Ejemplos', 'Nivel', 'Última revisión'];
+const MAX_LEVEL = 5;
 
 function ensureHeaders_(sheet) {
   const firstRow = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
@@ -59,7 +61,7 @@ function addWord_(sheet, text) {
     return jsonResponse_({ ok: true, saved: trimmed, count: newCount });
   }
 
-  sheet.appendRow([now, trimmed, 1, now, '', '']);
+  sheet.appendRow([now, trimmed, 1, now, '', '', 0, '']);
   return jsonResponse_({ ok: true, saved: trimmed, count: 1 });
 }
 
@@ -67,7 +69,7 @@ function listWords_(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return jsonResponse_({ ok: true, words: [] });
 
-  const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
   const words = data.map((row, i) => ({
     row: i + 2,
     firstDate: row[0] instanceof Date ? row[0].toISOString() : String(row[0]),
@@ -75,7 +77,9 @@ function listWords_(sheet) {
     count: row[2] || 1,
     lastDate: row[3] instanceof Date ? row[3].toISOString() : String(row[3] || row[0]),
     definition: row[4] || '',
-    examples: row[5] ? String(row[5]).split(' | ') : []
+    examples: row[5] ? String(row[5]).split(' | ') : [],
+    level: row[6] || 0,
+    lastReview: row[7] instanceof Date ? row[7].toISOString() : (row[7] || '')
   })).sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
 
   return jsonResponse_({ ok: true, words });
@@ -97,6 +101,19 @@ function updateWordInfo_(sheet, rowParam, definition, examplesParam) {
   return jsonResponse_({ ok: true });
 }
 
+function reviewWord_(sheet, rowParam, result) {
+  const row = parseInt(rowParam, 10);
+  if (!row || row < 2) return jsonResponse_({ ok: false, error: 'Invalid row' });
+
+  const levelCell = sheet.getRange(row, 7);
+  const currentLevel = Number(levelCell.getValue()) || 0;
+  const newLevel = result === 'know' ? Math.min(currentLevel + 1, MAX_LEVEL) : 0;
+
+  levelCell.setValue(newLevel);
+  sheet.getRange(row, 8).setValue(new Date());
+  return jsonResponse_({ ok: true, level: newLevel });
+}
+
 function doGet(e) {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getActiveSheet();
   ensureHeaders_(sheet);
@@ -113,6 +130,10 @@ function doGet(e) {
 
   if (action === 'update') {
     return updateWordInfo_(sheet, e.parameter.row, e.parameter.definition, e.parameter.examples);
+  }
+
+  if (action === 'review') {
+    return reviewWord_(sheet, e.parameter.row, e.parameter.result);
   }
 
   const text = e.parameter.text;
