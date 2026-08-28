@@ -37,9 +37,107 @@
     object-fit: cover;
     border-radius: 8px;
   }
-  header span {
+  header span.name {
     font-weight: 600;
     font-size: 1.1rem;
+    flex: 1;
+  }
+  .menu-btn {
+    position: relative;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 1.3rem;
+    line-height: 1;
+    padding: 0.4rem;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+  .menu-btn:hover {
+    background: var(--bg-alt);
+  }
+  .menu-btn .dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: none;
+  }
+  .menu-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 50;
+    padding: 1.5rem;
+  }
+  .menu-overlay.open {
+    display: flex;
+  }
+  .menu-panel {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 420px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+    text-align: left;
+  }
+  .menu-panel h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1.2rem;
+  }
+  .menu-panel .version {
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+  }
+  .menu-panel .close-btn {
+    float: right;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+  }
+  .changelog-entry {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .changelog-entry:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+  .changelog-entry .entry-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+  .changelog-entry .entry-version {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .changelog-entry .entry-date {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .changelog-entry ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
   }
   main {
     flex: 1;
@@ -173,8 +271,21 @@
 <body>
   <header>
     <img src="icon.png" alt="English icon">
-    <span>English</span>
+    <span class="name">English</span>
+    <button class="menu-btn" id="menu-btn" aria-label="Menú">
+      ☰
+      <span class="dot" id="update-dot"></span>
+    </button>
   </header>
+
+  <div class="menu-overlay" id="menu-overlay">
+    <div class="menu-panel">
+      <button class="close-btn" id="menu-close">✕</button>
+      <h2>Novedades</h2>
+      <div class="version" id="current-version"></div>
+      <div id="changelog-list"></div>
+    </div>
+  </div>
 
   <main>
     <img class="hero" src="icon.png" alt="English app icon">
@@ -217,6 +328,93 @@
 
   <script>
     const STORAGE_KEY = 'english-words';
+    const VERSION_KEY = 'english-app-version';
+
+    const APP_VERSION = '1.2.0';
+    const CHANGELOG = [
+      {
+        version: '1.2.0',
+        date: '2026-08-27',
+        changes: [
+          'Las palabras compartidas desde el iPhone ahora se guardan directo en Google Sheets, en segundo plano, sin abrir ninguna ventana.'
+        ]
+      },
+      {
+        version: '1.1.0',
+        date: '2026-08-27',
+        changes: [
+          'Nueva lista "Mis palabras" en la página, con botón para eliminar.',
+          'Se agregó el Atajo "Inglés" para compartir texto desde cualquier app de iOS.'
+        ]
+      },
+      {
+        version: '1.0.0',
+        date: '2026-08-27',
+        changes: [
+          'Primera versión: página de inicio, ícono de la app y repositorio.'
+        ]
+      }
+    ];
+
+    function renderChangelog() {
+      document.getElementById('current-version').textContent = `Versión ${APP_VERSION}`;
+      const list = document.getElementById('changelog-list');
+      list.innerHTML = '';
+
+      CHANGELOG.forEach(entry => {
+        const wrap = document.createElement('div');
+        wrap.className = 'changelog-entry';
+
+        const header = document.createElement('div');
+        header.className = 'entry-header';
+
+        const v = document.createElement('span');
+        v.className = 'entry-version';
+        v.textContent = `v${entry.version}`;
+
+        const d = document.createElement('span');
+        d.className = 'entry-date';
+        d.textContent = entry.date;
+
+        header.appendChild(v);
+        header.appendChild(d);
+
+        const ul = document.createElement('ul');
+        entry.changes.forEach(change => {
+          const li = document.createElement('li');
+          li.textContent = change;
+          ul.appendChild(li);
+        });
+
+        wrap.appendChild(header);
+        wrap.appendChild(ul);
+        list.appendChild(wrap);
+      });
+    }
+
+    function openMenu() {
+      document.getElementById('menu-overlay').classList.add('open');
+      document.getElementById('update-dot').style.display = 'none';
+      localStorage.setItem(VERSION_KEY, APP_VERSION);
+    }
+
+    function closeMenu() {
+      document.getElementById('menu-overlay').classList.remove('open');
+    }
+
+    function checkForUpdate() {
+      const seenVersion = localStorage.getItem(VERSION_KEY);
+      if (seenVersion && seenVersion !== APP_VERSION) {
+        document.getElementById('update-dot').style.display = 'block';
+
+        const toast = document.getElementById('toast');
+        toast.textContent = `¡Actualizado a la versión ${APP_VERSION}! Toca ☰ para ver qué cambió.`;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+      } else if (!seenVersion) {
+        localStorage.setItem(VERSION_KEY, APP_VERSION);
+      }
+    }
 
     function getWords() {
       try {
@@ -288,6 +486,14 @@
       }
     }
 
+    document.getElementById('menu-btn').onclick = openMenu;
+    document.getElementById('menu-close').onclick = closeMenu;
+    document.getElementById('menu-overlay').onclick = (e) => {
+      if (e.target.id === 'menu-overlay') closeMenu();
+    };
+
+    renderChangelog();
+    checkForUpdate();
     addFromQuery();
     render();
   </script>
