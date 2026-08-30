@@ -468,8 +468,15 @@
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.6.0';
+    const APP_VERSION = '1.6.1';
     const CHANGELOG = [
+      {
+        version: '1.6.1',
+        date: '2026-08-28',
+        changes: [
+          'Corregido: las definiciones de varias palabras nuevas ya no se piden todas a la vez (causaba fallos por límite de peticiones) — ahora se generan una por una, con reintento automático y botón "Reintentar" si falla.'
+        ]
+      },
       {
         version: '1.6.0',
         date: '2026-08-28',
@@ -604,7 +611,11 @@
       if (!data.ok) throw new Error(data.error || 'Error al borrar');
     }
 
-    async function generateWordInfo(word) {
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function generateWordInfoOnce(word) {
       const prompt = 'Give a short English dictionary definition and exactly 2 short example ' +
         'sentences using this word or phrase: "' + word + '". ' +
         'Respond ONLY with valid JSON, no markdown formatting, in exactly this shape: ' +
@@ -619,10 +630,26 @@
         }
       );
       const data = await res.json();
+      if (!data.candidates || !data.candidates[0]) {
+        throw new Error((data.error && data.error.message) || 'Sin respuesta de Gemini');
+      }
       const raw = data.candidates[0].content.parts[0].text;
       const cleaned = raw.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(cleaned);
       return { definition: parsed.definition || '', examples: parsed.examples || [] };
+    }
+
+    async function generateWordInfo(word, attempts = 3) {
+      let lastError;
+      for (let i = 0; i < attempts; i++) {
+        try {
+          return await generateWordInfoOnce(word);
+        } catch (err) {
+          lastError = err;
+          if (i < attempts - 1) await sleep(1500 * (i + 1));
+        }
+      }
+      throw lastError;
     }
 
     async function saveWordInfo(row, definition, examples) {
@@ -636,38 +663,47 @@
     }
 
     function renderDetail(detailEl, word) {
-      if (word.definition) {
-        detailEl.innerHTML = '';
+      detailEl.innerHTML = '';
 
-        const def = document.createElement('div');
-        def.className = 'definition';
-        def.textContent = word.definition;
-        detailEl.appendChild(def);
+      const def = document.createElement('div');
+      def.className = 'definition';
+      def.textContent = word.definition;
+      detailEl.appendChild(def);
 
-        if (word.examples.length) {
-          const ul = document.createElement('ul');
-          ul.className = 'examples';
-          word.examples.forEach(ex => {
-            const li = document.createElement('li');
-            li.textContent = ex;
-            ul.appendChild(li);
-          });
-          detailEl.appendChild(ul);
-        }
-        return;
-      }
-
-      detailEl.innerHTML = '<span class="loading">Generando definición…</span>';
-      generateWordInfo(word.text)
-        .then(info => {
-          word.definition = info.definition;
-          word.examples = info.examples;
-          renderDetail(detailEl, word);
-          saveWordInfo(word.row, info.definition, info.examples);
-        })
-        .catch(() => {
-          detailEl.innerHTML = '';
+      if (word.examples.length) {
+        const ul = document.createElement('ul');
+        ul.className = 'examples';
+        word.examples.forEach(ex => {
+          const li = document.createElement('li');
+          li.textContent = ex;
+          ul.appendChild(li);
         });
+        detailEl.appendChild(ul);
+      }
+    }
+
+    async function generateForWord(detailEl, word) {
+      detailEl.innerHTML = '<span class="loading">Generando definición…</span>';
+      try {
+        const info = await generateWordInfo(word.text);
+        word.definition = info.definition;
+        word.examples = info.examples;
+        renderDetail(detailEl, word);
+        saveWordInfo(word.row, info.definition, info.examples);
+      } catch {
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'practice-reveal-btn';
+        retryBtn.textContent = 'Reintentar';
+        retryBtn.onclick = () => generateForWord(detailEl, word);
+        detailEl.innerHTML = '';
+        detailEl.appendChild(retryBtn);
+      }
+    }
+
+    async function processGenerationQueue(queue) {
+      for (const { detailEl, word } of queue) {
+        await generateForWord(detailEl, word);
+      }
     }
 
     async function render() {
@@ -687,6 +723,8 @@
           return;
         }
         empty.style.display = 'none';
+
+        const toGenerate = [];
 
         words.forEach(word => {
           const li = document.createElement('li');
@@ -725,10 +763,18 @@
           const detail = document.createElement('div');
           detail.className = 'word-detail';
           li.appendChild(detail);
-          renderDetail(detail, word);
+
+          if (word.definition) {
+            renderDetail(detail, word);
+          } else {
+            detail.innerHTML = '<span class="loading">En cola…</span>';
+            toGenerate.push({ detailEl: detail, word });
+          }
 
           list.appendChild(li);
         });
+
+        processGenerationQueue(toGenerate);
       } catch (err) {
         empty.style.display = 'block';
         empty.innerHTML = 'No se pudo cargar tu lista. Revisa tu conexión e intenta de nuevo.';
