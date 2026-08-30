@@ -98,7 +98,7 @@
     color: var(--accent);
     font-size: 0.9rem;
     font-weight: 600;
-    margin-bottom: 1.25rem;
+    margin-bottom: 0.5rem;
   }
   .menu-panel .close-btn {
     float: right;
@@ -108,36 +108,9 @@
     font-size: 1.1rem;
     cursor: pointer;
   }
-  .changelog-entry {
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .changelog-entry:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-  }
-  .changelog-entry .entry-header {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    margin-bottom: 0.35rem;
-  }
-  .changelog-entry .entry-version {
-    font-weight: 600;
-    font-size: 0.95rem;
-  }
-  .changelog-entry .entry-date {
-    color: var(--muted);
-    font-size: 0.8rem;
-  }
-  .changelog-entry ul {
-    margin: 0;
-    padding-left: 1.1rem;
+  #version-status {
     color: var(--muted);
     font-size: 0.88rem;
-    line-height: 1.5;
   }
   main {
     flex: 1;
@@ -390,9 +363,9 @@
   <div class="menu-overlay" id="menu-overlay">
     <div class="menu-panel">
       <button class="close-btn" id="menu-close">✕</button>
-      <h2>Novedades</h2>
+      <h2>Versión</h2>
       <div class="version" id="current-version"></div>
-      <div id="changelog-list"></div>
+      <div id="version-status"></div>
     </div>
   </div>
 
@@ -443,8 +416,15 @@
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.6.1';
+    const APP_VERSION = '1.6.2';
     const CHANGELOG = [
+      {
+        version: '1.6.2',
+        date: '2026-08-28',
+        changes: [
+          'El menú ahora solo muestra la versión actual y si se actualizó, sin la lista completa de cambios.'
+        ]
+      },
       {
         version: '1.6.1',
         date: '2026-08-28',
@@ -504,40 +484,9 @@
       }
     ];
 
-    function renderChangelog() {
+    function renderVersionInfo() {
       document.getElementById('current-version').textContent = `Versión ${APP_VERSION}`;
-      const list = document.getElementById('changelog-list');
-      list.innerHTML = '';
-
-      CHANGELOG.forEach(entry => {
-        const wrap = document.createElement('div');
-        wrap.className = 'changelog-entry';
-
-        const header = document.createElement('div');
-        header.className = 'entry-header';
-
-        const v = document.createElement('span');
-        v.className = 'entry-version';
-        v.textContent = `v${entry.version}`;
-
-        const d = document.createElement('span');
-        d.className = 'entry-date';
-        d.textContent = entry.date;
-
-        header.appendChild(v);
-        header.appendChild(d);
-
-        const ul = document.createElement('ul');
-        entry.changes.forEach(change => {
-          const li = document.createElement('li');
-          li.textContent = change;
-          ul.appendChild(li);
-        });
-
-        wrap.appendChild(header);
-        wrap.appendChild(ul);
-        list.appendChild(wrap);
-      });
+      document.getElementById('version-status').textContent = versionStatusText;
     }
 
     function openMenu() {
@@ -550,13 +499,16 @@
       document.getElementById('menu-overlay').classList.remove('open');
     }
 
+    let versionStatusText = 'Estás en la última versión.';
+
     function checkForUpdate() {
       const seenVersion = localStorage.getItem(VERSION_KEY);
       if (seenVersion && seenVersion !== APP_VERSION) {
+        versionStatusText = `Se actualizó desde la versión ${seenVersion}.`;
         document.getElementById('update-dot').style.display = 'block';
 
         const toast = document.getElementById('toast');
-        toast.textContent = `¡Actualizado a la versión ${APP_VERSION}! Toca ☰ para ver qué cambió.`;
+        toast.textContent = `¡Actualizado a la versión ${APP_VERSION}!`;
         toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, 4000);
       } else if (!seenVersion) {
@@ -905,8 +857,8 @@
       if (e.target.id === 'practice-overlay') closePractice();
     };
 
-    renderChangelog();
     checkForUpdate();
+    renderVersionInfo();
     render();
   </script>
 </body>
