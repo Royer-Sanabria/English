@@ -416,8 +416,15 @@
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.7.0';
+    const APP_VERSION = '1.7.1';
     const CHANGELOG = [
+      {
+        version: '1.7.1',
+        date: '2026-08-28',
+        changes: [
+          'Las palabras guardadas antes de la traducción ahora también la generan automáticamente al abrir la página.'
+        ]
+      },
       {
         version: '1.7.0',
         date: '2026-08-28',
@@ -708,7 +715,7 @@
           detail.className = 'word-detail';
           li.appendChild(detail);
 
-          if (word.definition) {
+          if (word.definition && word.definitionEs) {
             renderDetail(detail, word);
           } else {
             detail.innerHTML = '<span class="loading">En cola…</span>';
