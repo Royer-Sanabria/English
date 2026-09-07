@@ -247,70 +247,8 @@
     font-size: 0.8rem;
     margin: -0.5rem 0 0.75rem;
   }
-  .az-section {
-    width: 100%;
-    max-width: 480px;
-    text-align: left;
-  }
-  .az-section h2 {
-    font-size: 1.1rem;
-    margin: 0 0 0.75rem;
-  }
-  .az-container {
-    display: flex;
-    gap: 0.75rem;
-    background: var(--bg-alt);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-  .az-letters {
-    display: flex;
-    flex-direction: column;
-    padding: 0.5rem 0.25rem;
-    border-right: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .az-letters button {
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 0.78rem;
-    padding: 0.12rem 0.4rem;
+  #word-list li {
     cursor: pointer;
-    border-radius: 4px;
-  }
-  .az-letters button:disabled {
-    opacity: 0.25;
-    cursor: default;
-  }
-  .az-letters button:not(:disabled):hover {
-    background: var(--border);
-    color: var(--text);
-  }
-  .az-words {
-    flex: 1;
-    max-height: 420px;
-    overflow-y: auto;
-    padding: 0.75rem 1rem 0.75rem 0;
-  }
-  .az-group-header {
-    color: var(--accent);
-    font-weight: 700;
-    font-size: 0.85rem;
-    margin: 0.75rem 0 0.25rem;
-  }
-  .az-group-header:first-child {
-    margin-top: 0;
-  }
-  .az-word {
-    padding: 0.3rem 0;
-    border-bottom: 1px solid var(--border);
-    word-break: break-word;
-    font-size: 0.9rem;
-  }
-  .az-word:last-child {
-    border-bottom: none;
   }
   .practice-btn {
     background: var(--accent);
@@ -453,14 +391,6 @@
         Selecciona texto en cualquier app → Compartir → Inglés.
       </div>
     </div>
-
-    <div class="az-section">
-      <h2>Índice A-Z</h2>
-      <div class="az-container">
-        <div class="az-letters" id="az-letters"></div>
-        <div class="az-words" id="az-words"></div>
-      </div>
-    </div>
   </main>
 
   <script>
@@ -468,8 +398,16 @@
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.9.1';
+    const APP_VERSION = '1.9.2';
     const CHANGELOG = [
+      {
+        version: '1.9.2',
+        date: '2026-09-07',
+        changes: [
+          'Se quitó el índice A-Z. "Mis palabras" ahora se ordena alfabéticamente.',
+          'Doble clic (o doble toque) sobre una palabra abre directamente su tarjeta de Practicar.'
+        ]
+      },
       {
         version: '1.9.1',
         date: '2026-09-07',
@@ -798,7 +736,8 @@
         const btn = document.createElement('button');
         btn.textContent = '✕';
         btn.setAttribute('aria-label', 'Eliminar');
-        btn.onclick = async () => {
+        btn.onclick = async (e) => {
+          e.stopPropagation();
           btn.disabled = true;
           try {
             await deleteWord(word.row);
@@ -810,80 +749,34 @@
 
         row.appendChild(btn);
         li.appendChild(row);
+        li.ondblclick = () => openPracticeForWord(word);
         list.appendChild(li);
       });
+    }
+
+    function sortedByText(words) {
+      return words.slice().sort((a, b) => a.text.localeCompare(b.text, 'en', { sensitivity: 'base' }));
     }
 
     function applyFilter() {
       const count = document.getElementById('word-count');
       const note = document.getElementById('list-note');
       const query = document.getElementById('search-input').value.trim().toLowerCase();
+      const sorted = sortedByText(allWords);
 
       count.textContent = allWords.length ? `(${allWords.length})` : '';
 
       if (query) {
-        const matches = allWords.filter(w => w.text.toLowerCase().includes(query));
+        const matches = sorted.filter(w => w.text.toLowerCase().includes(query));
         note.textContent = `${matches.length} resultado${matches.length === 1 ? '' : 's'} para "${query}"`;
         renderWordList(matches);
-      } else if (allWords.length > MAIN_LIST_LIMIT) {
-        note.textContent = `Mostrando las ${MAIN_LIST_LIMIT} más recientes`;
-        renderWordList(allWords.slice(0, MAIN_LIST_LIMIT));
+      } else if (sorted.length > MAIN_LIST_LIMIT) {
+        note.textContent = `Mostrando las ${MAIN_LIST_LIMIT} primeras (A-Z)`;
+        renderWordList(sorted.slice(0, MAIN_LIST_LIMIT));
       } else {
         note.textContent = '';
-        renderWordList(allWords);
+        renderWordList(sorted);
       }
-    }
-
-    function renderAzIndex() {
-      const letters = document.getElementById('az-letters');
-      const wordsEl = document.getElementById('az-words');
-      letters.innerHTML = '';
-      wordsEl.innerHTML = '';
-
-      const sorted = allWords.slice().sort((a, b) => a.text.localeCompare(b.text, 'en', { sensitivity: 'base' }));
-      const byLetter = {};
-      sorted.forEach(w => {
-        const letter = (w.text.trim()[0] || '#').toUpperCase();
-        const key = /[A-Z]/.test(letter) ? letter : '#';
-        if (!byLetter[key]) byLetter[key] = [];
-        byLetter[key].push(w);
-      });
-
-      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-      alphabet.forEach(letter => {
-        const btn = document.createElement('button');
-        btn.textContent = letter;
-        const hasWords = !!byLetter[letter];
-        btn.disabled = !hasWords;
-        if (hasWords) {
-          btn.onclick = () => {
-            const target = document.getElementById(`az-group-${letter}`);
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          };
-        }
-        letters.appendChild(btn);
-      });
-
-      if (sorted.length === 0) {
-        wordsEl.innerHTML = '<span class="loading">Todavía no hay palabras.</span>';
-        return;
-      }
-
-      alphabet.concat(['#']).forEach(key => {
-        if (!byLetter[key]) return;
-        const header = document.createElement('div');
-        header.className = 'az-group-header';
-        header.id = `az-group-${key}`;
-        header.textContent = key;
-        wordsEl.appendChild(header);
-
-        byLetter[key].forEach(w => {
-          const item = document.createElement('div');
-          item.className = 'az-word';
-          item.textContent = w.text;
-          wordsEl.appendChild(item);
-        });
-      });
     }
 
     async function render() {
@@ -903,7 +796,6 @@
           applyFilter();
         }
 
-        renderAzIndex();
         backfillMissingWords(allWords);
       } catch (err) {
         empty.style.display = 'block';
@@ -1063,6 +955,18 @@
 
     function closePractice() {
       document.getElementById('practice-overlay').classList.remove('open');
+    }
+
+    function openPracticeForWord(word) {
+      if (!word.definition) {
+        alert('Esta palabra todavía no tiene definición lista. Espera un momento e intenta de nuevo.');
+        return;
+      }
+      practiceQueue = [word];
+      practiceIndex = 0;
+      practiceReviewed = 0;
+      document.getElementById('practice-overlay').classList.add('open');
+      renderPracticeCard();
     }
 
     async function startPractice() {
