@@ -364,6 +364,7 @@
       <h2>Versión</h2>
       <div class="version" id="current-version"></div>
       <div id="version-status"></div>
+      <button class="practice-btn" id="check-update-btn" style="margin-top: 1rem;">Buscar actualizaciones</button>
     </div>
   </div>
 
@@ -398,8 +399,15 @@
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.9.2';
+    const APP_VERSION = '1.9.3';
     const CHANGELOG = [
+      {
+        version: '1.9.3',
+        date: '2026-09-07',
+        changes: [
+          'Nuevo botón "Buscar actualizaciones" en el menú, para forzar la recarga de la última versión sin esperar a que el navegador la traiga sola.'
+        ]
+      },
       {
         version: '1.9.2',
         date: '2026-09-07',
@@ -811,6 +819,15 @@
     document.getElementById('menu-overlay').onclick = (e) => {
       if (e.target.id === 'menu-overlay') closeMenu();
     };
+
+    function forceCheckForUpdate() {
+      const btn = document.getElementById('check-update-btn');
+      btn.disabled = true;
+      btn.textContent = 'Buscando…';
+      location.replace(location.pathname + '?refresh=' + Date.now());
+    }
+
+    document.getElementById('check-update-btn').onclick = forceCheckForUpdate;
 
     const MAX_LEVEL = 5;
     let practiceQueue = [];
