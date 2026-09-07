@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>English — Extensión para aprender inglés</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-square.png">
+<link rel="icon" href="icon-square.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="English">
+<meta name="theme-color" content="#0f1115">
 <style>
   :root {
     --bg: #0f1115;
@@ -237,40 +244,89 @@
     padding: 1.25rem;
     text-align: center;
   }
-  .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-    max-width: 700px;
+  .search-input {
     width: 100%;
-  }
-  .card {
     background: var(--bg-alt);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem;
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+  .search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .list-note {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin: -0.5rem 0 0.75rem;
+  }
+  .az-section {
+    width: 100%;
+    max-width: 480px;
     text-align: left;
   }
-  .card h3 {
-    margin: 0 0 0.4rem;
-    font-size: 1rem;
+  .az-section h2 {
+    font-size: 1.1rem;
+    margin: 0 0 0.75rem;
   }
-  .card p {
-    margin: 0;
+  .az-container {
+    display: flex;
+    gap: 0.75rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .az-letters {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.25rem;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .az-letters button {
+    background: none;
+    border: none;
     color: var(--muted);
-    font-size: 0.9rem;
-    line-height: 1.4;
+    font-size: 0.78rem;
+    padding: 0.12rem 0.4rem;
+    cursor: pointer;
+    border-radius: 4px;
   }
-  footer {
-    text-align: center;
-    padding: 1.25rem;
-    color: var(--muted);
-    font-size: 0.85rem;
-    border-top: 1px solid var(--border);
+  .az-letters button:disabled {
+    opacity: 0.25;
+    cursor: default;
   }
-  footer a {
+  .az-letters button:not(:disabled):hover {
+    background: var(--border);
+    color: var(--text);
+  }
+  .az-words {
+    flex: 1;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 0.75rem 1rem 0.75rem 0;
+  }
+  .az-group-header {
     color: var(--accent);
-    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin: 0.75rem 0 0.25rem;
+  }
+  .az-group-header:first-child {
+    margin-top: 0;
+  }
+  .az-word {
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--border);
+    word-break: break-word;
+    font-size: 0.9rem;
+  }
+  .az-word:last-child {
+    border-bottom: none;
   }
   .practice-btn {
     background: var(--accent);
@@ -400,10 +456,13 @@
     <div class="toast" id="toast">Agregado a tu lista ✓</div>
 
     <div class="words-section">
+      <input type="search" id="search-input" class="search-input" placeholder="Buscar palabra…">
+
       <h2>
         Mis palabras <span class="count" id="word-count"></span>
         <button class="practice-btn" id="practice-btn">Practicar</button>
       </h2>
+      <div class="list-note" id="list-note"></div>
       <ul id="word-list"></ul>
       <div class="empty" id="empty-state">
         Todavía no tienes palabras guardadas.<br>
@@ -411,33 +470,33 @@
       </div>
     </div>
 
-    <div class="features">
-      <div class="card">
-        <h3>Vocabulario en contexto</h3>
-        <p>Guarda palabras nuevas mientras navegas, sin salir de la app.</p>
-      </div>
-      <div class="card">
-        <h3>Desde cualquier app</h3>
-        <p>Usa el Atajo "Inglés" en el menú Compartir de iOS.</p>
-      </div>
-      <div class="card">
-        <h3>Progreso simple</h3>
-        <p>Tu lista se guarda en este dispositivo, sin complicaciones.</p>
+    <div class="az-section">
+      <h2>Índice A-Z</h2>
+      <div class="az-container">
+        <div class="az-letters" id="az-letters"></div>
+        <div class="az-words" id="az-words"></div>
       </div>
     </div>
   </main>
-
-  <footer>
-    <a href="https://github.com/Royer-Sanabria/English">Ver código en GitHub</a>
-  </footer>
 
   <script>
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8qCTmE1wsdLz2KrSbi1hI9UER0_4pfN83FXCHgQqGl7Te2yTwz93SKTq2NLyqzLjgPQ/exec';
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.8.0';
+    const APP_VERSION = '1.9.0';
     const CHANGELOG = [
+      {
+        version: '1.9.0',
+        date: '2026-09-07',
+        changes: [
+          'Nuevo buscador de palabras.',
+          'La pantalla principal ahora muestra solo las 10 palabras más recientes (busca para ver el resto).',
+          'Nuevo índice A-Z: alfabeto a la izquierda, palabras ordenadas alfabéticamente a la derecha (sin definición ni ejemplos).',
+          'Se quitaron los bloques informativos y el enlace a GitHub de la pantalla principal.',
+          'La app ahora se puede agregar a la pantalla de inicio del iPhone con su propio ícono.'
+        ]
+      },
       {
         version: '1.8.0',
         date: '2026-08-28',
@@ -745,81 +804,173 @@
       }
     }
 
-    async function render() {
+    const MAIN_LIST_LIMIT = 10;
+    let allWords = [];
+
+    function renderWordList(words) {
       const list = document.getElementById('word-list');
       const empty = document.getElementById('empty-state');
+
+      list.innerHTML = '';
+
+      if (words.length === 0) {
+        empty.style.display = 'block';
+        empty.innerHTML = 'No hay palabras que coincidan.';
+        return;
+      }
+      empty.style.display = 'none';
+
+      const toGenerate = [];
+
+      words.forEach(word => {
+        const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const span = document.createElement('span');
+        span.className = 'text';
+        span.textContent = word.text;
+        row.appendChild(span);
+
+        if (word.count > 1) {
+          const badge = document.createElement('span');
+          badge.className = 'badge-count';
+          badge.textContent = `×${word.count}`;
+          badge.title = `Compartida ${word.count} veces`;
+          row.appendChild(badge);
+        }
+
+        const btn = document.createElement('button');
+        btn.textContent = '✕';
+        btn.setAttribute('aria-label', 'Eliminar');
+        btn.onclick = async () => {
+          btn.disabled = true;
+          try {
+            await deleteWord(word.row);
+            render();
+          } catch {
+            btn.disabled = false;
+          }
+        };
+
+        row.appendChild(btn);
+        li.appendChild(row);
+
+        const detail = document.createElement('div');
+        detail.className = 'word-detail';
+        li.appendChild(detail);
+
+        if (word.definition && word.definitionEs) {
+          renderDetail(detail, word);
+        } else {
+          detail.innerHTML = '<span class="loading">En cola…</span>';
+          toGenerate.push({ detailEl: detail, word });
+        }
+
+        list.appendChild(li);
+      });
+
+      processGenerationQueue(toGenerate);
+    }
+
+    function applyFilter() {
       const count = document.getElementById('word-count');
+      const note = document.getElementById('list-note');
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+
+      count.textContent = allWords.length ? `(${allWords.length})` : '';
+
+      if (query) {
+        const matches = allWords.filter(w => w.text.toLowerCase().includes(query));
+        note.textContent = `${matches.length} resultado${matches.length === 1 ? '' : 's'} para "${query}"`;
+        renderWordList(matches);
+      } else if (allWords.length > MAIN_LIST_LIMIT) {
+        note.textContent = `Mostrando las ${MAIN_LIST_LIMIT} más recientes`;
+        renderWordList(allWords.slice(0, MAIN_LIST_LIMIT));
+      } else {
+        note.textContent = '';
+        renderWordList(allWords);
+      }
+    }
+
+    function renderAzIndex() {
+      const letters = document.getElementById('az-letters');
+      const wordsEl = document.getElementById('az-words');
+      letters.innerHTML = '';
+      wordsEl.innerHTML = '';
+
+      const sorted = allWords.slice().sort((a, b) => a.text.localeCompare(b.text, 'en', { sensitivity: 'base' }));
+      const byLetter = {};
+      sorted.forEach(w => {
+        const letter = (w.text.trim()[0] || '#').toUpperCase();
+        const key = /[A-Z]/.test(letter) ? letter : '#';
+        if (!byLetter[key]) byLetter[key] = [];
+        byLetter[key].push(w);
+      });
+
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      alphabet.forEach(letter => {
+        const btn = document.createElement('button');
+        btn.textContent = letter;
+        const hasWords = !!byLetter[letter];
+        btn.disabled = !hasWords;
+        if (hasWords) {
+          btn.onclick = () => {
+            const target = document.getElementById(`az-group-${letter}`);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          };
+        }
+        letters.appendChild(btn);
+      });
+
+      if (sorted.length === 0) {
+        wordsEl.innerHTML = '<span class="loading">Todavía no hay palabras.</span>';
+        return;
+      }
+
+      alphabet.concat(['#']).forEach(key => {
+        if (!byLetter[key]) return;
+        const header = document.createElement('div');
+        header.className = 'az-group-header';
+        header.id = `az-group-${key}`;
+        header.textContent = key;
+        wordsEl.appendChild(header);
+
+        byLetter[key].forEach(w => {
+          const item = document.createElement('div');
+          item.className = 'az-word';
+          item.textContent = w.text;
+          wordsEl.appendChild(item);
+        });
+      });
+    }
+
+    async function render() {
+      const empty = document.getElementById('empty-state');
+      const list = document.getElementById('word-list');
 
       try {
-        const words = await fetchWords();
+        allWords = await fetchWords();
 
-        count.textContent = words.length ? `(${words.length})` : '';
-        list.innerHTML = '';
-
-        if (words.length === 0) {
+        if (allWords.length === 0) {
           empty.style.display = 'block';
           empty.innerHTML = 'Todavía no tienes palabras guardadas.<br>Selecciona texto en cualquier app → Compartir → Inglés.';
-          return;
+          document.getElementById('word-count').textContent = '';
+          document.getElementById('list-note').textContent = '';
+          list.innerHTML = '';
+        } else {
+          applyFilter();
         }
-        empty.style.display = 'none';
 
-        const toGenerate = [];
-
-        words.forEach(word => {
-          const li = document.createElement('li');
-          const row = document.createElement('div');
-          row.className = 'row';
-
-          const span = document.createElement('span');
-          span.className = 'text';
-          span.textContent = word.text;
-          row.appendChild(span);
-
-          if (word.count > 1) {
-            const badge = document.createElement('span');
-            badge.className = 'badge-count';
-            badge.textContent = `×${word.count}`;
-            badge.title = `Compartida ${word.count} veces`;
-            row.appendChild(badge);
-          }
-
-          const btn = document.createElement('button');
-          btn.textContent = '✕';
-          btn.setAttribute('aria-label', 'Eliminar');
-          btn.onclick = async () => {
-            btn.disabled = true;
-            try {
-              await deleteWord(word.row);
-              render();
-            } catch {
-              btn.disabled = false;
-            }
-          };
-
-          row.appendChild(btn);
-          li.appendChild(row);
-
-          const detail = document.createElement('div');
-          detail.className = 'word-detail';
-          li.appendChild(detail);
-
-          if (word.definition && word.definitionEs) {
-            renderDetail(detail, word);
-          } else {
-            detail.innerHTML = '<span class="loading">En cola…</span>';
-            toGenerate.push({ detailEl: detail, word });
-          }
-
-          list.appendChild(li);
-        });
-
-        processGenerationQueue(toGenerate);
+        renderAzIndex();
       } catch (err) {
         empty.style.display = 'block';
         empty.innerHTML = 'No se pudo cargar tu lista. Revisa tu conexión e intenta de nuevo.';
         list.innerHTML = '';
       }
     }
+
+    document.getElementById('search-input').oninput = applyFilter;
 
     document.getElementById('menu-btn').onclick = openMenu;
     document.getElementById('menu-close').onclick = closeMenu;
