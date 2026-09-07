@@ -182,22 +182,6 @@
     flex: 1;
     font-weight: 500;
   }
-  .word-detail {
-    font-size: 0.82rem;
-    color: var(--muted);
-    line-height: 1.45;
-  }
-  .word-detail .definition {
-    margin-bottom: 0.25rem;
-  }
-  .word-detail .examples {
-    margin: 0;
-    padding-left: 1.1rem;
-  }
-  .word-detail .loading {
-    font-style: italic;
-    opacity: 0.7;
-  }
   .tenses-block {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
@@ -484,8 +468,15 @@
     const GEMINI_API_KEY = 'AQ.Ab8RN6IgC_0-8V4fHtU4rlboCphBS8HwY9kGrpSein40mS3Q4Q';
     const VERSION_KEY = 'english-app-version';
 
-    const APP_VERSION = '1.9.0';
+    const APP_VERSION = '1.9.1';
     const CHANGELOG = [
+      {
+        version: '1.9.1',
+        date: '2026-09-07',
+        changes: [
+          'La lista principal "Mis palabras" ahora es solo el listado (palabra, conteo y borrar), sin definición ni ejemplos. La generación sigue ocurriendo en segundo plano para que Practicar funcione igual.'
+        ]
+      },
       {
         version: '1.9.0',
         date: '2026-09-07',
@@ -752,55 +743,21 @@
       return wrap;
     }
 
-    function renderDetail(detailEl, word) {
-      detailEl.innerHTML = '';
-
-      const def = document.createElement('div');
-      def.className = 'definition';
-      def.textContent = word.definition;
-      detailEl.appendChild(def);
-
-      if (word.examples.length) {
-        const ul = document.createElement('ul');
-        ul.className = 'examples';
-        word.examples.forEach(ex => {
-          const li = document.createElement('li');
-          li.textContent = ex;
-          ul.appendChild(li);
-        });
-        detailEl.appendChild(ul);
-      }
-
-      const tensesBlock = buildTensesBlock(word);
-      if (tensesBlock) detailEl.appendChild(tensesBlock);
-    }
-
-    async function generateForWord(detailEl, word) {
-      detailEl.innerHTML = '<span class="loading">Generando definición…</span>';
+    async function backfillWord(word) {
       try {
         const info = await generateWordInfo(word.text);
-        word.definition = info.definition;
-        word.examples = info.examples;
-        word.definitionEs = info.definitionEs;
-        word.examplesEs = info.examplesEs;
-        word.isVerb = info.isVerb;
-        word.baseForm = info.baseForm;
-        word.tenses = info.tenses;
-        renderDetail(detailEl, word);
+        Object.assign(word, info);
         saveWordInfo(word.row, info);
       } catch {
-        const retryBtn = document.createElement('button');
-        retryBtn.className = 'practice-reveal-btn';
-        retryBtn.textContent = 'Reintentar';
-        retryBtn.onclick = () => generateForWord(detailEl, word);
-        detailEl.innerHTML = '';
-        detailEl.appendChild(retryBtn);
+        // Se reintenta la próxima vez que se cargue la página.
       }
     }
 
-    async function processGenerationQueue(queue) {
-      for (const { detailEl, word } of queue) {
-        await generateForWord(detailEl, word);
+    async function backfillMissingWords(words) {
+      for (const word of words) {
+        if (!(word.definition && word.definitionEs)) {
+          await backfillWord(word);
+        }
       }
     }
 
@@ -819,8 +776,6 @@
         return;
       }
       empty.style.display = 'none';
-
-      const toGenerate = [];
 
       words.forEach(word => {
         const li = document.createElement('li');
@@ -855,22 +810,8 @@
 
         row.appendChild(btn);
         li.appendChild(row);
-
-        const detail = document.createElement('div');
-        detail.className = 'word-detail';
-        li.appendChild(detail);
-
-        if (word.definition && word.definitionEs) {
-          renderDetail(detail, word);
-        } else {
-          detail.innerHTML = '<span class="loading">En cola…</span>';
-          toGenerate.push({ detailEl: detail, word });
-        }
-
         list.appendChild(li);
       });
-
-      processGenerationQueue(toGenerate);
     }
 
     function applyFilter() {
@@ -963,6 +904,7 @@
         }
 
         renderAzIndex();
+        backfillMissingWords(allWords);
       } catch (err) {
         empty.style.display = 'block';
         empty.innerHTML = 'No se pudo cargar tu lista. Revisa tu conexión e intenta de nuevo.';
